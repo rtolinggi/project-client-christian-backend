@@ -110,7 +110,9 @@ func SignIn(ctx *fiber.Ctx) error {
 		Name:     "refresh-token",
 		Path:     "/",
 		Value:    refreshToken,
+		Expires:  time.Now().Add(time.Hour * 24 * 30),
 		HTTPOnly: true,
+		SameSite: "lax",
 	})
 
 	return ctx.Status(fiber.StatusAccepted).JSON(fiber.Map{
@@ -166,8 +168,13 @@ func SignUp(ctx *fiber.Ctx) error {
 	})
 }
 
-func LogOut(ctx *fiber.Ctx) error {
-	ctx.ClearCookie("refresh-token")
+func SignOut(ctx *fiber.Ctx) error {
+	ctx.Cookie(&fiber.Cookie{
+		Name:     "refresh-token",
+		Expires:  time.Now().Add(-(time.Hour * 2)),
+		HTTPOnly: true,
+		SameSite: "lax",
+	})
 	return ctx.Status(fiber.StatusOK).JSON(fiber.Map{
 		"success": true,
 		"message": "Logout Is Success",

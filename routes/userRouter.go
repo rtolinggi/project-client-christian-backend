@@ -10,7 +10,7 @@ import (
 
 func SetUserRoute(app *fiber.App) {
 
-	api := app.Group("/api/user", middleware.ProtectedRoute, logger.New())
+	api := app.Group("/api/user", logger.New(), middleware.ProtectedRoute)
 
 	api.Get("/", controllers.GetUsers)
 

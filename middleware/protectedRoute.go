@@ -1,8 +1,6 @@
 package middleware
 
 import (
-	"fmt"
-
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/rtolinggi/sales-api/config"
@@ -10,6 +8,13 @@ import (
 
 func ProtectedRoute(ctx *fiber.Ctx) error {
 	refreshToken := ctx.Cookies("refresh-token")
+	if refreshToken == "" {
+		return ctx.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"success": false,
+			"message": "Token kosong, silahkan login",
+		})
+	}
+
 	claims := &config.JWTClaim{}
 
 	token, err := jwt.ParseWithClaims(refreshToken, claims, func(t *jwt.Token) (interface{}, error) {
@@ -18,12 +23,11 @@ func ProtectedRoute(ctx *fiber.Ctx) error {
 
 	if err != nil {
 		v, _ := err.(*jwt.ValidationError)
-		fmt.Println(v)
 		switch v.Errors {
 		case jwt.ValidationErrorSignatureInvalid:
 			return ctx.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 				"success": false,
-				"message": "Secret tidak valid",
+				"message": "Token tidak valid",
 			})
 		case jwt.ValidationErrorExpired:
 			return ctx.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
