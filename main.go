@@ -18,14 +18,15 @@ func main() {
 	app := fiber.New()
 
 	app.Use(cors.New(cors.Config{
-		AllowOrigins:     "http://localhost:3000",
+		AllowOrigins:     "http://127.0.0.1:3000",
 		AllowHeaders:     "Origin, Content-Type, Accept",
 		AllowCredentials: true,
 	}))
 
 	// inital Route
-	routes.SetUserRoute(app)
 	routes.SetAuthRoute(app)
+	routes.SetUserRoute(app)
+	routes.SetKaryawanRoute(app)
 
 	app.Use(func(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{

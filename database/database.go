@@ -6,7 +6,7 @@ import (
 	"strconv"
 
 	"github.com/rtolinggi/sales-api/config"
-	// "github.com/rtolinggi/sales-api/models"
+	"github.com/rtolinggi/sales-api/models"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	// "gorm.io/gorm/logger"
@@ -35,8 +35,8 @@ func ConnectDB() {
 
 	log.Println("Database Connected")
 	// db.Logger = logger.Default.LogMode(logger.Info)
-	// log.Println("running migrations")
-	// db.AutoMigrate(&models.Karyawan{}, &models.User{})
+	log.Println("running migrations")
+	db.AutoMigrate(&models.Karyawan{}, &models.User{})
 
 	DB = DBinstance{
 		DB: db,

@@ -7,6 +7,7 @@ import (
 type Karyawan struct {
 	gorm.Model
 	NamaLengkap   string `json:"nama_lengkap" validate:"required"`
+	Avatar        string `json:"avatar" gorm:"default:avatar.png" validate:"require"`
 	NomorRekening string `json:"nomor_rekening" validate:"required"`
 	NamaRekening  string `json:"nama_rekening" validate:"required"`
 	NamaBank      string `json:"nama_bank" validate:"required"`
