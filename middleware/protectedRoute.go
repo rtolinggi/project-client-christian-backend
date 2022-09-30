@@ -11,9 +11,6 @@ import (
 func ProtectedRoute(ctx *fiber.Ctx) error {
 
 	accessToken := strings.Split(ctx.Get("Authorization"), " ")
-	dataCookie := ctx.Cookies("refresh_token")
-	println(dataCookie)
-	println("TESTING")
 	if accessToken[0] == "" || accessToken[1] == "" {
 		return ctx.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"success": false,

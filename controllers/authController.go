@@ -185,11 +185,30 @@ func SignOut(ctx *fiber.Ctx) error {
 
 func GetToken(ctx *fiber.Ctx) error {
 	refreshToken := ctx.Cookies("refresh_token")
+
 	if refreshToken == "" {
 		return ctx.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"success": false,
 			"message": "Token kosong, silahkan login",
 		})
+	}
+
+	db := database.DB.DB
+	user := new(models.User)
+
+	if err := db.Where("refresh_token = ?", refreshToken).First(&user).Error; err != nil {
+		switch err {
+		case gorm.ErrRecordNotFound:
+			return ctx.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"success": false,
+				"message": "Token Tidak Valid dengan Token di Database",
+			})
+		default:
+			return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"success": false,
+				"message": "Terjadi gangguan di Server",
+			})
+		}
 	}
 
 	claims := &config.JWTClaim{}
