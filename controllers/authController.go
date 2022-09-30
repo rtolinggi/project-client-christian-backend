@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/rtolinggi/sales-api/config"
 	"github.com/rtolinggi/sales-api/database"
 	"github.com/rtolinggi/sales-api/models"
@@ -107,7 +108,7 @@ func SignIn(ctx *fiber.Ctx) error {
 	}
 
 	ctx.Cookie(&fiber.Cookie{
-		Name:     "refresh-token",
+		Name:     "refresh_token",
 		Path:     "/",
 		Value:    refreshToken,
 		Expires:  time.Now().Add(time.Hour * 24 * 30),
@@ -170,13 +171,76 @@ func SignUp(ctx *fiber.Ctx) error {
 
 func SignOut(ctx *fiber.Ctx) error {
 	ctx.Cookie(&fiber.Cookie{
-		Name:     "refresh-token",
+		Name:     "refresh_token",
 		Expires:  time.Now().Add(-(time.Hour * 2)),
 		HTTPOnly: true,
 		SameSite: "lax",
 	})
+
 	return ctx.Status(fiber.StatusOK).JSON(fiber.Map{
 		"success": true,
 		"message": "Logout Is Success",
+	})
+}
+
+func GetToken(ctx *fiber.Ctx) error {
+	refreshToken := ctx.Cookies("refresh_token")
+	if refreshToken == "" {
+		return ctx.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"success": false,
+			"message": "Token kosong, silahkan login",
+		})
+	}
+
+	claims := &config.JWTClaim{}
+
+	token, err := jwt.ParseWithClaims(refreshToken, claims, func(t *jwt.Token) (interface{}, error) {
+		return config.JWT_REFRESH_TOKEN_SECRET, nil
+	})
+
+	if err != nil {
+		v, _ := err.(*jwt.ValidationError)
+		switch v.Errors {
+		case jwt.ValidationErrorSignatureInvalid:
+			return ctx.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"success": false,
+				"message": "Token tidak valid",
+			})
+		case jwt.ValidationErrorExpired:
+			return ctx.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"success": false,
+				"message": "Token sudah expired",
+			})
+		default:
+			return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"success": false,
+				"message": "Server mengalamai gangguan",
+				"error":   v,
+			})
+		}
+	}
+
+	if !token.Valid {
+		return ctx.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"success": false,
+			"message": "Token tidak valid",
+		})
+	}
+
+	accessToken, err := config.GenerateAccessToken(time.Now().Add(time.Minute*1), &config.JWTClaim{
+		NamaPengguna: claims.NamaPengguna,
+		Role:         claims.Role,
+	}, config.JWT_ACCESS_TOKEN_SECRET)
+
+	if err != nil {
+		return ctx.Status(500).JSON(fiber.Map{
+			"success": false,
+			"message": "Internal Server Error",
+		})
+	}
+
+	return ctx.Status(fiber.StatusOK).JSON(fiber.Map{
+		"success":      true,
+		"access_token": accessToken,
 	})
 }

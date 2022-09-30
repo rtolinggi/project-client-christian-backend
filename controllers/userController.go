@@ -8,6 +8,7 @@ import (
 
 // Get All User
 func GetUsers(c *fiber.Ctx) error {
+
 	db := database.DB.DB
 	user := new([]models.User)
 
