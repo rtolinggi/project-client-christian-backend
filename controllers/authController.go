@@ -36,16 +36,21 @@ func SignIn(ctx *fiber.Ctx) error {
 
 	if err := ctx.BodyParser(input); err != nil {
 		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"success": false,
-			"errors":  err.Error(),
-			"message": "Body Parser Error",
+			"code":   400,
+			"status": "Bad Request",
+			"data":   nil,
+			"errors": fiber.Map{
+				"message": err.Error(),
+			},
 		})
 	}
 
 	if err := validation.ValidatorStruct(input); err != nil {
 		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"success": false,
-			"errors":  err,
+			"code":   400,
+			"status": "Bad Request",
+			"data":   nil,
+			"errors": err,
 		})
 	}
 
@@ -53,22 +58,34 @@ func SignIn(ctx *fiber.Ctx) error {
 	if err := db.Where("nama_pengguna = ?", input.NamaPengguna).First(&user).Error; err != nil {
 		switch err {
 		case gorm.ErrRecordNotFound:
-			return ctx.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"success": false,
-				"message": "Nama Pengguna atau Password salah",
+			return ctx.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"code":   404,
+				"status": "Not Found",
+				"data":   nil,
+				"errors": fiber.Map{
+					"message": err.Error(),
+				},
 			})
 		default:
 			return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"success": false,
-				"message": "Terjadi gangguan di Server",
+				"code":   500,
+				"status": "Internal Server Error",
+				"data":   nil,
+				"errors": fiber.Map{
+					"message": err.Error(),
+				},
 			})
 		}
 	}
 
 	if err := decodePassword(user.KataSandi, input.KataSandi); err != nil {
 		return ctx.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"success": false,
-			"message": "Nama Pengguna atau Password Salah",
+			"code":   401,
+			"status": "Unauthorized",
+			"data":   nil,
+			"errors": fiber.Map{
+				"message": err.Error(),
+			},
 		})
 	}
 
@@ -79,9 +96,12 @@ func SignIn(ctx *fiber.Ctx) error {
 
 	if err != nil {
 		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"success": false,
-			"message": "Terjadi gangguan di Server, gagal membuat token",
-			"error":   err.Error(),
+			"code":   500,
+			"status": "Internal Server Error",
+			"data":   nil,
+			"errors": fiber.Map{
+				"message": err.Error(),
+			},
 		})
 	}
 
@@ -92,18 +112,24 @@ func SignIn(ctx *fiber.Ctx) error {
 
 	if err != nil {
 		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"success": false,
-			"message": "Terjadi gangguan di Server, gagal membuat token",
-			"error":   err.Error(),
+			"code":   500,
+			"status": "Internal Server Error",
+			"data":   nil,
+			"errors": fiber.Map{
+				"message": err.Error(),
+			},
 		})
 	}
 
 	user.RefreshToken = refreshToken
 	if err := db.Where("nama_pengguna = ?", input.NamaPengguna).Updates(&user).Error; err != nil {
 		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"success": false,
-			"message": "terjadi gangguan di server",
-			"error":   err,
+			"code":   500,
+			"status": "Internal Server Error",
+			"data":   nil,
+			"errors": fiber.Map{
+				"message": err.Error(),
+			},
 		})
 	}
 
@@ -117,69 +143,117 @@ func SignIn(ctx *fiber.Ctx) error {
 	})
 
 	return ctx.Status(fiber.StatusAccepted).JSON(fiber.Map{
-		"success":      true,
-		"message":      "Login Berhasil",
-		"access_token": accessToken,
-		"user": fiber.Map{
-			"nama_pengguna": user.NamaPengguna,
-			"role":          user.Role,
+		"code":   202,
+		"status": "Accepted",
+		"data": fiber.Map{
+			"access_token": accessToken,
+			"user": fiber.Map{
+				"nama_pengguna": user.NamaPengguna,
+				"role":          user.Role,
+			},
 		},
+		"errors": nil,
 	})
 }
 
 func SignUp(ctx *fiber.Ctx) error {
 	user := new(models.User)
 
+	db := database.DB.DB
+
 	if err := ctx.BodyParser(user); err != nil {
 		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"success": false,
-			"errors":  err.Error(),
+			"code":   400,
+			"status": "Bad Request",
+			"data":   nil,
+			"errors": fiber.Map{
+				"message": err.Error(),
+			},
 		})
 	}
 
-	if err := validation.ValidatorStruct(*user); err != nil {
+	if err := validation.ValidatorStruct(user); err != nil {
 		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"success": false,
-			"errors":  err,
+			"code":   400,
+			"status": "Bad Request",
+			"data":   nil,
+			"errors": err,
+		})
+	}
+
+	count := db.Limit(1).Find(&user, "nama_pengguna = ?", user.NamaPengguna)
+	if count.Error != nil {
+		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"code":   500,
+			"status": "Internal Server Error",
+			"data":   nil,
+			"errors": fiber.Map{
+				"message": count.Error.Error(),
+			},
+		})
+	}
+
+	if count.RowsAffected > 0 {
+		return ctx.Status(fiber.StatusConflict).JSON(fiber.Map{
+			"code":   409,
+			"status": "Conflict",
+			"data":   nil,
+			"errors": fiber.Map{
+				"message": "Nama Pengguna Already Exist",
+			},
 		})
 	}
 
 	hash, err := hashPassword(user.KataSandi)
 	if err != nil {
-		return ctx.Status(500).JSON(fiber.Map{
-			"success": false,
-			"message": "Couldn't hash password",
-			"data":    err.Error(),
+		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"code":   500,
+			"status": "Internal Server Error",
+			"data":   nil,
+			"errors": fiber.Map{
+				"message": err.Error(),
+			},
 		})
 	}
 
 	user.KataSandi = hash
-	db := database.DB.DB
+
 	if err := db.Create(&user).Error; err != nil {
-		return ctx.Status(500).JSON(fiber.Map{
-			"success": false,
-			"message": "Couldn't create user",
-			"data":    err.Error(),
+		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"code":   500,
+			"status": "Internal Server Error",
+			"data":   nil,
+			"errors": fiber.Map{
+				"message": err.Error(),
+			},
 		})
 	}
 
 	return ctx.Status(fiber.StatusCreated).JSON(fiber.Map{
-		"success": true,
-		"data":    user,
+		"code":   201,
+		"status": "Created",
+		"data":   user,
+		"errors": nil,
 	})
+
 }
 
 func SignOut(ctx *fiber.Ctx) error {
 	ctx.Cookie(&fiber.Cookie{
 		Name:     "refresh_token",
+		Path:     "/",
 		Expires:  time.Now().Add(-(time.Hour * 2)),
 		HTTPOnly: true,
 		SameSite: "lax",
 	})
 
 	return ctx.Status(fiber.StatusOK).JSON(fiber.Map{
-		"success": true,
-		"message": "Logout Is Success",
+		"code":   200,
+		"status": "OK",
+		"data": fiber.Map{
+			"message": "Logout Success",
+		},
+		"errors": nil,
 	})
 }
 
@@ -188,8 +262,12 @@ func GetToken(ctx *fiber.Ctx) error {
 
 	if refreshToken == "" {
 		return ctx.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"success": false,
-			"message": "Token kosong, silahkan login",
+			"code":   401,
+			"status": "Unauthorized",
+			"data":   nil,
+			"errors": fiber.Map{
+				"message": "Token Empty, Please login",
+			},
 		})
 	}
 
@@ -200,13 +278,21 @@ func GetToken(ctx *fiber.Ctx) error {
 		switch err {
 		case gorm.ErrRecordNotFound:
 			return ctx.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"success": false,
-				"message": "Token Tidak Valid dengan Token di Database",
+				"code":   401,
+				"status": "Unauthorized",
+				"data":   nil,
+				"errors": fiber.Map{
+					"message": "Token not Valid and not found in Database",
+				},
 			})
 		default:
 			return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"success": false,
-				"message": "Terjadi gangguan di Server",
+				"code":   500,
+				"status": "Internal Server Error",
+				"data":   nil,
+				"errors": fiber.Map{
+					"message": "Terjadi gangguan di Server",
+				},
 			})
 		}
 	}
@@ -222,27 +308,43 @@ func GetToken(ctx *fiber.Ctx) error {
 		switch v.Errors {
 		case jwt.ValidationErrorSignatureInvalid:
 			return ctx.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"success": false,
-				"message": "Token tidak valid",
+				"code":   401,
+				"status": "Unauthorized",
+				"data":   nil,
+				"errors": fiber.Map{
+					"message": "Token not valid",
+				},
 			})
 		case jwt.ValidationErrorExpired:
 			return ctx.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"success": false,
-				"message": "Token sudah expired",
+				"code":   401,
+				"status": "Unaautorized",
+				"data":   nil,
+				"errors": fiber.Map{
+					"message": "Token is expired",
+				},
 			})
 		default:
 			return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"success": false,
-				"message": "Server mengalamai gangguan",
-				"error":   v,
+				"code":   500,
+				"status": "Internal Server Error",
+				"data":   nil,
+				"errors": fiber.Map{
+					"message": v.Errors,
+				},
 			})
 		}
 	}
 
 	if !token.Valid {
 		return ctx.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"code":    401,
+			"status":  "Unauthorized",
+			"data":    nil,
 			"success": false,
-			"message": "Token tidak valid",
+			"errors": fiber.Map{
+				"message": "Token Not valid",
+			},
 		})
 	}
 
@@ -252,14 +354,22 @@ func GetToken(ctx *fiber.Ctx) error {
 	}, config.JWT_ACCESS_TOKEN_SECRET)
 
 	if err != nil {
-		return ctx.Status(500).JSON(fiber.Map{
-			"success": false,
-			"message": "Internal Server Error",
+		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"code":   500,
+			"status": "Internal Server Error",
+			"data":   nil,
+			"errors": fiber.Map{
+				"message": err.Error(),
+			},
 		})
 	}
 
 	return ctx.Status(fiber.StatusOK).JSON(fiber.Map{
-		"success":      true,
-		"access_token": accessToken,
+		"code":   200,
+		"status": "OK",
+		"data": fiber.Map{
+			"access_token": accessToken,
+		},
+		"errors": nil,
 	})
 }
