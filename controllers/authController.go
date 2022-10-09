@@ -18,12 +18,12 @@ type InputSignIn struct {
 	KataSandi    string `json:"kata_sandi" validate:"required"`
 }
 
-func hashPassword(password string) (string, error) {
+func HashPassword(password string) (string, error) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	return string(hash), err
 }
 
-func decodePassword(hashPassword, password string) error {
+func DecodePassword(hashPassword, password string) error {
 	if err := bcrypt.CompareHashAndPassword([]byte(hashPassword), []byte(password)); err != nil {
 		return err
 	}
@@ -78,13 +78,13 @@ func SignIn(ctx *fiber.Ctx) error {
 		}
 	}
 
-	if err := decodePassword(user.KataSandi, input.KataSandi); err != nil {
+	if err := DecodePassword(user.KataSandi, input.KataSandi); err != nil {
 		return ctx.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"code":   401,
 			"status": "Unauthorized",
 			"data":   nil,
 			"errors": fiber.Map{
-				"message": err.Error(),
+				"message": "Salah Decode Passwod",
 			},
 		})
 	}
@@ -204,7 +204,7 @@ func SignUp(ctx *fiber.Ctx) error {
 		})
 	}
 
-	hash, err := hashPassword(user.KataSandi)
+	hash, err := HashPassword(user.KataSandi)
 	if err != nil {
 		return ctx.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"code":   500,
